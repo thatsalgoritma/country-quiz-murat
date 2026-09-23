@@ -1,12 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Target } from "./targets";
 import { answersMatch } from "./answerMatch";
-import { passOnlineTurn, subscribeToRoom, submitOnlineAnswer, type OnlineAnswer, type OnlineRoom } from "./onlineRooms";
+import {
+  passOnlineTurn,
+  subscribeToRoom,
+  submitOnlineAnswer,
+  type OnlineAnswer,
+  type OnlineRoom,
+} from "./onlineRooms";
 import { supabase } from "./supabase";
 
-export function useOnlineFreeTypeGame(targets: Target[], initialRoom: OnlineRoom, playerNumber: 1 | 2) {
+export function useOnlineFreeTypeGame(
+  targets: Target[],
+  initialRoom: OnlineRoom,
+  playerNumber: 1 | 2,
+) {
   const [room, setRoom] = useState(initialRoom);
   const [answers, setAnswers] = useState<Map<string, 1 | 2>>(new Map());
+
+  const [playerNames, setPlayerNames] = useState<Record<1 | 2, string>>({
+    1: "Oyuncu 1",
+    2: "Oyuncu 2",
+  });
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [shakeToken, setShakeToken] = useState(0);
@@ -15,25 +31,75 @@ export function useOnlineFreeTypeGame(targets: Target[], initialRoom: OnlineRoom
   const refresh = useCallback(async () => {
     if (!supabase) return;
 
-    const [{ data: roomData, error: roomError }, { data: answerData, error: answerError }] = await Promise.all([
-      supabase.from("game_rooms").select("*").eq("id", initialRoom.id).single(),
-      supabase.from("game_room_answers").select("room_id,target_key,player_number").eq("room_id", initialRoom.id),
+    const [
+      { data: roomData, error: roomError },
+      { data: answerData, error: answerError },
+      { data: playerData, error: playerError },
+    ] = await Promise.all([
+      supabase
+        .from("game_rooms")
+        .select("*")
+        .eq("id", initialRoom.id)
+        .single(),
+
+      supabase
+        .from("game_room_answers")
+        .select("room_id,target_key,player_number")
+        .eq("room_id", initialRoom.id),
+
+      supabase
+        .from("game_room_players")
+        .select("player_number,display_name")
+        .eq("room_id", initialRoom.id),
     ]);
 
-    if (roomError || answerError) {
-      setError(roomError?.message ?? answerError?.message ?? "Oda verisi alınamadı.");
+    if (roomError || answerError || playerError) {
+      setError(
+        roomError?.message ??
+          answerError?.message ??
+          playerError?.message ??
+          "Oda verisi alınamadı.",
+      );
       setLoading(false);
       return;
     }
 
     setRoom(roomData as OnlineRoom);
-    setAnswers(new Map((answerData as OnlineAnswer[]).map((answer) => [answer.target_key, answer.player_number])));
+
+    setAnswers(
+      new Map(
+        (answerData as OnlineAnswer[]).map((answer) => [
+          answer.target_key,
+          answer.player_number,
+        ]),
+      ),
+    );
+
+    const names: Record<1 | 2, string> = {
+      1: "Oyuncu 1",
+      2: "Oyuncu 2",
+    };
+
+    const players = (playerData ?? []) as Array<{
+      player_number: number;
+      display_name: string;
+    }>;
+
+    for (const player of players) {
+      if (player.player_number === 1 || player.player_number === 2) {
+        names[player.player_number] = player.display_name;
+      }
+    }
+
+    setPlayerNames(names);
     setLoading(false);
   }, [initialRoom.id]);
 
   useEffect(() => {
     void refresh();
+
     const channel = subscribeToRoom(initialRoom.id, () => void refresh());
+
     return () => {
       void channel.unsubscribe();
     };
@@ -41,38 +107,75 @@ export function useOnlineFreeTypeGame(targets: Target[], initialRoom: OnlineRoom
 
   const submit = useCallback(
     async (text: string) => {
-      if (!text.trim() || room.status !== "playing" || room.active_player !== playerNumber || submitting) return false;
+      if (
+        !text.trim() ||
+        room.status !== "playing" ||
+        room.active_player !== playerNumber ||
+        submitting
+      ) {
+        return false;
+      }
 
-      const match = targets.find((target) => !answers.has(target.key) && answersMatch(text, target.answer));
+      const match = targets.find(
+        (target) =>
+          !answers.has(target.key) && answersMatch(text, target.answer),
+      );
+
       if (!match) {
         setShakeToken((token) => token + 1);
         setSubmitting(true);
+
         try {
           await passOnlineTurn(room.id);
           await refresh();
         } catch (submissionError) {
-          setError(submissionError instanceof Error ? submissionError.message : "Tur devredilemedi.");
+          setError(
+            submissionError instanceof Error
+              ? submissionError.message
+              : "Tur devredilemedi.",
+          );
         } finally {
           setSubmitting(false);
         }
+
         return false;
       }
 
       setSubmitting(true);
       setError(null);
+
       try {
         const accepted = await submitOnlineAnswer(room.id, match.key);
-        if (!accepted) setError("Bu cevap az önce diğer oyuncu tarafından yazıldı.");
+
+        if (!accepted) {
+          setError("Bu cevap az önce diğer oyuncu tarafından yazıldı.");
+        }
+
         await refresh();
+
         return accepted;
       } catch (submissionError) {
-        setError(submissionError instanceof Error ? submissionError.message : "Cevap gönderilemedi.");
+        setError(
+          submissionError instanceof Error
+            ? submissionError.message
+            : "Cevap gönderilemedi.",
+        );
+
         return false;
       } finally {
         setSubmitting(false);
       }
     },
-    [answers, playerNumber, refresh, room.active_player, room.id, room.status, submitting, targets]
+    [
+      answers,
+      playerNumber,
+      refresh,
+      room.active_player,
+      room.id,
+      room.status,
+      submitting,
+      targets,
+    ],
   );
 
   const markers = useMemo(
@@ -83,19 +186,41 @@ export function useOnlineFreeTypeGame(targets: Target[], initialRoom: OnlineRoom
           key: target.key,
           lat: target.lat,
           lng: target.lng,
-          color: answers.get(target.key) === 2 ? ("red" as const) : ("blue" as const),
+          color:
+            answers.get(target.key) === 2
+              ? ("red" as const)
+              : ("blue" as const),
         })),
-    [answers, targets]
+    [answers, targets],
   );
 
   const countryOwnerById = useMemo(() => {
     const owners = new Map<string, "blue" | "red">();
+
     for (const target of targets) {
       const owner = answers.get(target.key);
-      if (owner && !owners.has(target.mapId)) owners.set(target.mapId, owner === 1 ? "blue" : "red");
+
+      if (owner && !owners.has(target.mapId)) {
+        owners.set(
+          target.mapId,
+          owner === 1 ? "blue" : "red",
+        );
+      }
     }
+
     return owners;
   }, [answers, targets]);
 
-  return { room, answers, loading, submitting, shakeToken, error, markers, countryOwnerById, submit };
+  return {
+    room,
+    answers,
+    loading,
+    submitting,
+    shakeToken,
+    error,
+    markers,
+    countryOwnerById,
+    playerNames,
+    submit,
+  };
 }

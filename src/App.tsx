@@ -1,24 +1,44 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchCountries, type Country } from "./countries";
-import { buildCapitalTargets, buildCountryTargets, buildCityTargets, type Target } from "./targets";
+import {
+  buildCapitalTargets,
+  buildCountryTargets,
+  buildCityTargets,
+  type Target,
+} from "./targets";
 import { useFreeTypeGame, type PlayerId } from "./useFreeTypeGame";
 import { useClueGame } from "./useClueGame";
 import { useOnlineFreeTypeGame } from "./useOnlineFreeTypeGame";
-import { createOnlineRoom, joinOnlineRoom, type OnlineRoom } from "./onlineRooms";
+import {
+  createOnlineRoom,
+  joinOnlineRoom,
+  type OnlineRoom,
+} from "./onlineRooms";
 import { WorldMap } from "./WorldMap";
 import { formatElapsed } from "./useTimer";
 import "./App.css";
 
 type LoadState = "loading" | "ready" | "error";
-type GameMode = "capital-write" | "country-write" | "city-write" | "flag-write" | "flag-choice";
+type GameMode =
+  | "capital-write"
+  | "country-write"
+  | "city-write"
+  | "flag-write"
+  | "flag-choice";
 type PlayerMode = "solo" | "versus" | "online";
 
 const MODE_LABELS: Record<GameMode, { title: string; hint: string }> = {
   "capital-write": { title: "Başkent Yazma", hint: "Bildiğin başkentleri yaz" },
   "country-write": { title: "Ülke Adı Yazma", hint: "Bildiğin ülkeleri yaz" },
   "city-write": { title: "Şehir Yazma", hint: "Bildiğin şehirleri yaz" },
-  "flag-write": { title: "Bayraktan Ülke (Yazarak)", hint: "Bayrağı gör, ülkeyi yaz" },
-  "flag-choice": { title: "Bayraktan Ülke (4 Şıklı)", hint: "Bayrağı gör, doğru şıkkı seç" },
+  "flag-write": {
+    title: "Bayraktan Ülke (Yazarak)",
+    hint: "Bayrağı gör, ülkeyi yaz",
+  },
+  "flag-choice": {
+    title: "Bayraktan Ülke (4 Şıklı)",
+    hint: "Bayrağı gör, doğru şıkkı seç",
+  },
 };
 
 // ---------- ortak küçük bileşenler ----------
@@ -122,18 +142,25 @@ function Checklist({
             {twoColumn ? (
               <>
                 <span className="checklist-label">{t.countryName}</span>
-                <span className="checklist-value">{showAnswer ? t.answer : "—"}</span>
+                <span className="checklist-value">
+                  {showAnswer ? t.answer : "—"}
+                </span>
               </>
             ) : (
               <>
                 <span className="checklist-label" aria-label={t.countryName}>
                   {t.flag}
                 </span>
-                <span className="checklist-value">{showAnswer ? t.countryName : "—"}</span>
+                <span className="checklist-value">
+                  {showAnswer ? t.countryName : "—"}
+                </span>
               </>
             )}
             {onRevealTarget && !showAnswer && (
-              <button className="btn btn--ghost btn--reveal" onClick={() => onRevealTarget(t.key)}>
+              <button
+                className="btn btn--ghost btn--reveal"
+                onClick={() => onRevealTarget(t.key)}
+              >
                 Göster
               </button>
             )}
@@ -173,9 +200,15 @@ function RegionFilters({
   selectedRegion: string;
   onSelect: (region: string) => void;
 }) {
-  const regions = [...new Set(targets.map(regionLabel))].sort((a, b) => a.localeCompare(b, "tr"));
+  const regions = [...new Set(targets.map(regionLabel))].sort((a, b) =>
+    a.localeCompare(b, "tr"),
+  );
   const remainingFor = (region: string) =>
-    targets.filter((target) => (region === "Tümü" || regionLabel(target) === region) && !guessed.has(target.key)).length;
+    targets.filter(
+      (target) =>
+        (region === "Tümü" || regionLabel(target) === region) &&
+        !guessed.has(target.key),
+    ).length;
 
   return (
     <div className="region-filters">
@@ -184,7 +217,10 @@ function RegionFilters({
         {["Tümü", ...regions].map((region) => (
           <button
             key={region}
-            className={"region-filter" + (selectedRegion === region ? " region-filter--active" : "")}
+            className={
+              "region-filter" +
+              (selectedRegion === region ? " region-filter--active" : "")
+            }
             onClick={() => onSelect(region)}
           >
             {region} <span>{remainingFor(region)}</span>
@@ -206,7 +242,11 @@ function AnswerRevealControls({
     <div className="answer-reveal-controls">
       <p className="answer-reveal-note">Doğru cevapları görmek ister misin?</p>
       <div className="answer-reveal-actions">
-        <button className="btn btn--ghost btn--small" onClick={onRevealAll} disabled={remainingCount === 0}>
+        <button
+          className="btn btn--ghost btn--small"
+          onClick={onRevealAll}
+          disabled={remainingCount === 0}
+        >
           Tüm doğruları göster
         </button>
       </div>
@@ -218,9 +258,22 @@ function formatPopulation(population?: number) {
   return population ? new Intl.NumberFormat("tr-TR").format(population) : null;
 }
 
-function GrowingList({ items }: { items: { key: string; countryName: string; answer: string; population?: number }[] }) {
+function GrowingList({
+  items,
+}: {
+  items: {
+    key: string;
+    countryName: string;
+    answer: string;
+    population?: number;
+  }[];
+}) {
   if (items.length === 0) {
-    return <p className="checklist-empty">Doğru yazdığın şehirler burada listelenecek.</p>;
+    return (
+      <p className="checklist-empty">
+        Doğru yazdığın şehirler burada listelenecek.
+      </p>
+    );
   }
   return (
     <ul className="checklist">
@@ -229,7 +282,11 @@ function GrowingList({ items }: { items: { key: string; countryName: string; ans
           <span className="checklist-label">{t.countryName}</span>
           <span className="checklist-value">
             {t.answer}
-            {formatPopulation(t.population) && <small className="city-population">{formatPopulation(t.population)}</small>}
+            {formatPopulation(t.population) && (
+              <small className="city-population">
+                {formatPopulation(t.population)}
+              </small>
+            )}
           </span>
         </li>
       ))}
@@ -240,19 +297,27 @@ function GrowingList({ items }: { items: { key: string; countryName: string; ans
 function PlayerAnswerLists({
   targets,
   answerOwners,
+  playerNames,
 }: {
   targets: Target[];
   answerOwners: Map<string, PlayerId>;
+  playerNames?: Record<1 | 2, string>;
 }) {
-  const playerItems = (player: PlayerId) => targets.filter((target) => answerOwners.get(target.key) === player);
+  const playerItems = (player: PlayerId) =>
+    targets.filter((target) => answerOwners.get(target.key) === player);
 
   return (
     <div className="player-answer-lists">
       {([1, 2] as const).map((player) => {
         const items = playerItems(player);
         return (
-          <section key={player} className={`player-answer-list player-answer-list--${player}`}>
-            <h2>Oyuncu {player} · {items.length}</h2>
+          <section
+            key={player}
+            className={`player-answer-list player-answer-list--${player}`}
+          >
+            <h2>
+              {playerNames?.[player] ?? `Oyuncu ${player}`} · {items.length}
+            </h2>{" "}
             {items.length === 0 ? (
               <p>Henüz doğru cevap yok.</p>
             ) : (
@@ -308,7 +373,13 @@ function FreeTypeGameScreen({
   };
 
   const revealAll = () => {
-    setRevealed(new Set(targets.filter((target) => !game.guessed.has(target.key)).map((target) => target.key)));
+    setRevealed(
+      new Set(
+        targets
+          .filter((target) => !game.guessed.has(target.key))
+          .map((target) => target.key),
+      ),
+    );
   };
 
   const restart = () => {
@@ -317,28 +388,41 @@ function FreeTypeGameScreen({
     game.restart();
   };
 
-  const unrevealedCount = targets.filter((target) => !game.guessed.has(target.key) && !revealed.has(target.key)).length;
+  const unrevealedCount = targets.filter(
+    (target) => !game.guessed.has(target.key) && !revealed.has(target.key),
+  ).length;
   const visibleTargets = useMemo(
-    () => (selectedRegion === "Tümü" ? targets : targets.filter((target) => regionLabel(target) === selectedRegion)),
-    [selectedRegion, targets]
+    () =>
+      selectedRegion === "Tümü"
+        ? targets
+        : targets.filter((target) => regionLabel(target) === selectedRegion),
+    [selectedRegion, targets],
   );
   const visibleGrowingItems = growingItems.filter(
-    (item) => selectedRegion === "Tümü" || regionLabel(item) === selectedRegion
+    (item) => selectedRegion === "Tümü" || regionLabel(item) === selectedRegion,
   );
   const correctCountryIds = useMemo(
-    () => new Set(targets.filter((target) => game.guessed.has(target.key)).map((target) => target.mapId)),
-    [targets, game.guessed]
+    () =>
+      new Set(
+        targets
+          .filter((target) => game.guessed.has(target.key))
+          .map((target) => target.mapId),
+      ),
+    [targets, game.guessed],
   );
   const countryOwnerById = useMemo(() => {
     const owners = new Map<string, "blue" | "red">();
     for (const target of targets) {
       const owner = game.answerOwners.get(target.key);
-      if (owner && !owners.has(target.mapId)) owners.set(target.mapId, owner === 1 ? "blue" : "red");
+      if (owner && !owners.has(target.mapId))
+        owners.set(target.mapId, owner === 1 ? "blue" : "red");
     }
     return owners;
   }, [targets, game.answerOwners]);
   const playerScores = ([1, 2] as const).map(
-    (player) => [...game.answerOwners.values()].filter((owner) => owner === player).length
+    (player) =>
+      [...game.answerOwners.values()].filter((owner) => owner === player)
+        .length,
   );
 
   if (game.finished) {
@@ -362,18 +446,18 @@ function FreeTypeGameScreen({
         title={MODE_LABELS[mode].title}
         timeLabel={formatElapsed(game.timer.elapsedMs)}
         running={game.timer.running}
-        onToggleTimer={() => (game.timer.running ? game.timer.pause() : game.timer.start())}
+        onToggleTimer={() =>
+          game.timer.running ? game.timer.pause() : game.timer.start()
+        }
         progressLabel={`${game.doneCount} / ${game.total}`}
         onFinish={game.finish}
         onExit={onExit}
       />
 
-      {game.multiplayer && (
-        <div className={`turn-banner turn-banner--${game.activePlayer}`}>
-          Oyuncu {game.activePlayer}&apos;in sırası
-        </div>
-      )}
-
+<PlayerAnswerLists
+  targets={visibleTargets}
+  answerOwners={game.answerOwners}
+/>
       <form
         className="text-answer"
         onSubmit={(e) => {
@@ -391,7 +475,11 @@ function FreeTypeGameScreen({
           autoFocus
           autoComplete="off"
         />
-        <button type="submit" className="btn btn--primary" disabled={!typedValue.trim()}>
+        <button
+          type="submit"
+          className="btn btn--primary"
+          disabled={!typedValue.trim()}
+        >
           Gönder
         </button>
       </form>
@@ -417,9 +505,12 @@ function FreeTypeGameScreen({
               onRevealAll={revealAll}
             />
           )}
-          {game.multiplayer ? (
-            <PlayerAnswerLists targets={visibleTargets} answerOwners={game.answerOwners} />
-          ) : mode === "city-write" ? (
+{game.multiplayer ? (
+  <PlayerAnswerLists
+    targets={visibleTargets}
+    answerOwners={game.answerOwners}
+  />
+) : mode === "city-write" ? (
             <GrowingList items={visibleGrowingItems} />
           ) : (
             <Checklist
@@ -455,10 +546,16 @@ function OnlineLobby({
     setBusy(true);
     setError(null);
     try {
-      const code = crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
+      const code = crypto
+        .randomUUID()
+        .replace(/-/g, "")
+        .slice(0, 6)
+        .toUpperCase();
       onReady(await createOnlineRoom(code, mode, displayName.trim()), 1);
     } catch (roomError) {
-      setError(roomError instanceof Error ? roomError.message : "Oda oluşturulamadı.");
+      setError(
+        roomError instanceof Error ? roomError.message : "Oda oluşturulamadı.",
+      );
     } finally {
       setBusy(false);
     }
@@ -469,9 +566,14 @@ function OnlineLobby({
     setBusy(true);
     setError(null);
     try {
-      onReady(await joinOnlineRoom(roomCode.trim().toUpperCase(), displayName.trim()), 2);
+      onReady(
+        await joinOnlineRoom(roomCode.trim().toUpperCase(), displayName.trim()),
+        2,
+      );
     } catch (roomError) {
-      setError(roomError instanceof Error ? roomError.message : "Odaya katılınamadı.");
+      setError(
+        roomError instanceof Error ? roomError.message : "Odaya katılınamadı.",
+      );
     } finally {
       setBusy(false);
     }
@@ -482,7 +584,9 @@ function OnlineLobby({
       <button className="btn btn--ghost btn--small setup-back" onClick={onExit}>
         ← Modlar
       </button>
-      <span className="eyebrow-mark">Çevrimiçi 1v1 · {MODE_LABELS[mode].title}</span>
+      <span className="eyebrow-mark">
+        Çevrimiçi 1v1 · {MODE_LABELS[mode].title}
+      </span>
       <h1 className="prompt">Bir oda oluştur veya katıl</h1>
       <input
         className="text-answer-input"
@@ -492,22 +596,39 @@ function OnlineLobby({
         maxLength={24}
         autoComplete="off"
       />
-      <button className="btn btn--primary" onClick={() => void createRoom()} disabled={!displayName.trim() || busy}>
+      <button
+        className="btn btn--primary"
+        onClick={() => void createRoom()}
+        disabled={!displayName.trim() || busy}
+      >
         Oda oluştur
       </button>
       <div className="online-divider">veya</div>
       <input
         className="text-answer-input room-code-input"
         value={roomCode}
-        onChange={(event) => setRoomCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
+        onChange={(event) =>
+          setRoomCode(
+            event.target.value
+              .toUpperCase()
+              .replace(/[^A-Z0-9]/g, "")
+              .slice(0, 6),
+          )
+        }
         placeholder="6 haneli oda kodu"
         maxLength={6}
         autoComplete="off"
       />
-      <button className="btn btn--ghost" onClick={() => void joinRoom()} disabled={!displayName.trim() || roomCode.length !== 6 || busy}>
+      <button
+        className="btn btn--ghost"
+        onClick={() => void joinRoom()}
+        disabled={!displayName.trim() || roomCode.length !== 6 || busy}
+      >
         Odaya katıl
       </button>
-      <p className="online-lobby-note">Katılmak için oyuncu adı ve altı haneli oda kodu gerekir.</p>
+      <p className="online-lobby-note">
+        Katılmak için oyuncu adı ve altı haneli oda kodu gerekir.
+      </p>
       {error && <p className="online-error">{error}</p>}
     </div>
   );
@@ -531,11 +652,15 @@ function OnlineFreeTypeGameScreen({
   const [selectedRegion, setSelectedRegion] = useState("Tümü");
   const guessed = useMemo(() => new Set(game.answers.keys()), [game.answers]);
   const visibleTargets = useMemo(
-    () => (selectedRegion === "Tümü" ? targets : targets.filter((target) => regionLabel(target) === selectedRegion)),
-    [selectedRegion, targets]
+    () =>
+      selectedRegion === "Tümü"
+        ? targets
+        : targets.filter((target) => regionLabel(target) === selectedRegion),
+    [selectedRegion, targets],
   );
   const scores = ([1, 2] as const).map(
-    (player) => [...game.answers.values()].filter((owner) => owner === player).length
+    (player) =>
+      [...game.answers.values()].filter((owner) => owner === player).length,
   );
 
   const submit = async () => {
@@ -564,12 +689,18 @@ function OnlineFreeTypeGameScreen({
         <div className="card card--summary">
           <span className="eyebrow-mark">Oda kodu</span>
           <h1 className="summary-time room-code-display">{game.room.code}</h1>
-          <p className="summary-line">İkinci oyuncunun bu kodla odaya katılması bekleniyor.</p>
+          <p className="summary-line">
+            İkinci oyuncunun bu kodla odaya katılması bekleniyor.
+          </p>
         </div>
       ) : (
         <>
-          <div className={`turn-banner turn-banner--${game.room.active_player}`}>
-            {game.room.active_player === playerNumber ? "Sıra sende" : "Rakibinin sırası"}
+          <div
+            className={`turn-banner turn-banner--${game.room.active_player}`}
+          >
+            {game.room.active_player === playerNumber
+              ? "Sıra sende"
+              : "Rakibinin sırası"}
           </div>
           <form
             className="text-answer"
@@ -584,28 +715,59 @@ function OnlineFreeTypeGameScreen({
               className="text-answer-input shake-on-token"
               value={typedValue}
               onChange={(event) => setTypedValue(event.target.value)}
-              placeholder={game.room.active_player === playerNumber ? "Cevabını yaz…" : "Rakibin yazıyor…"}
-              disabled={game.room.active_player !== playerNumber || game.submitting}
+              placeholder={
+                game.room.active_player === playerNumber
+                  ? "Cevabını yaz…"
+                  : "Rakibin yazıyor…"
+              }
+              disabled={
+                game.room.active_player !== playerNumber || game.submitting
+              }
               autoFocus
               autoComplete="off"
             />
-            <button type="submit" className="btn btn--primary" disabled={!typedValue.trim() || game.submitting || game.room.active_player !== playerNumber}>
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={
+                !typedValue.trim() ||
+                game.submitting ||
+                game.room.active_player !== playerNumber
+              }
+            >
               Gönder
             </button>
           </form>
           <div className="game-layout">
             <div className="map-pane">
-              <WorldMap markers={game.markers} countryOwnerById={game.countryOwnerById} />
+              <WorldMap
+                markers={game.markers}
+                countryOwnerById={game.countryOwnerById}
+              />
             </div>
             <aside className="list-pane">
-              <RegionFilters targets={targets} guessed={guessed} selectedRegion={selectedRegion} onSelect={setSelectedRegion} />
-              <PlayerAnswerLists targets={visibleTargets} answerOwners={game.answers} />
-              <p className="online-score">Oyuncu 1: {scores[0]} · Oyuncu 2: {scores[1]}</p>
+              <RegionFilters
+                targets={targets}
+                guessed={guessed}
+                selectedRegion={selectedRegion}
+                onSelect={setSelectedRegion}
+              />
+              <PlayerAnswerLists
+                targets={visibleTargets}
+                answerOwners={game.answers}
+                playerNames={game.playerNames}
+              />{" "}
+              <p className="online-score">
+                {game.playerNames[1]}: {scores[0]} · {game.playerNames[2]}:{" "}
+                {scores[1]}
+              </p>
             </aside>
           </div>
         </>
       )}
-      {game.error && <p className="online-error online-error--game">{game.error}</p>}
+      {game.error && (
+        <p className="online-error online-error--game">{game.error}</p>
+      )}
     </>
   );
 }
@@ -627,13 +789,16 @@ function ClueGameScreen({
   const [typedValue, setTypedValue] = useState("");
   const mode: GameMode = withChoices ? "flag-choice" : "flag-write";
   const playerScores = ([1, 2] as const).map(
-    (player) => [...game.answerOwners.values()].filter((owner) => owner === player).length
+    (player) =>
+      [...game.answerOwners.values()].filter((owner) => owner === player)
+        .length,
   );
   const countryOwnerById = useMemo(() => {
     const owners = new Map<string, "blue" | "red">();
     for (const target of targets) {
       const owner = game.answerOwners.get(target.key);
-      if (owner && !owners.has(target.mapId)) owners.set(target.mapId, owner === 1 ? "blue" : "red");
+      if (owner && !owners.has(target.mapId))
+        owners.set(target.mapId, owner === 1 ? "blue" : "red");
     }
     return owners;
   }, [targets, game.answerOwners]);
@@ -664,29 +829,39 @@ function ClueGameScreen({
         title={MODE_LABELS[mode].title}
         timeLabel={formatElapsed(game.timer.elapsedMs)}
         running={game.timer.running}
-        onToggleTimer={() => (game.timer.running ? game.timer.pause() : game.timer.start())}
+        onToggleTimer={() =>
+          game.timer.running ? game.timer.pause() : game.timer.start()
+        }
         progressLabel={`${game.correctCount} doğru • ${game.total - game.doneCount} kaldı`}
         onFinish={game.finish}
         onExit={onExit}
       />
 
-      {game.multiplayer && (
-        <div className={`turn-banner turn-banner--${game.activePlayer}`}>
-          Oyuncu {game.activePlayer}&apos;in sırası
-        </div>
-      )}
+<PlayerAnswerLists
+  targets={targets}
+  answerOwners={game.answerOwners}
+/>
 
       <div className={"card" + (withChoices ? "" : " card--map")}>
-        {game.current && <div className="flag-display">{game.current.flag}</div>}
+        {game.current && (
+          <div className="flag-display">{game.current.flag}</div>
+        )}
 
         {withChoices ? (
           <div className="options">
             {game.choiceOptions.map((opt) => {
               const picked = game.choiceResult?.picked === opt;
-              const isAnswerRow = game.choiceResult && opt === game.current?.answer;
+              const isAnswerRow =
+                game.choiceResult && opt === game.current?.answer;
               let stateClass = "";
-              if (game.choiceResult && isAnswerRow) stateClass = " option--correct";
-              else if (picked && game.choiceResult && !game.choiceResult.correct) stateClass = " option--wrong";
+              if (game.choiceResult && isAnswerRow)
+                stateClass = " option--correct";
+              else if (
+                picked &&
+                game.choiceResult &&
+                !game.choiceResult.correct
+              )
+                stateClass = " option--wrong";
               return (
                 <button
                   key={opt}
@@ -718,24 +893,39 @@ function ClueGameScreen({
                 autoFocus
                 autoComplete="off"
               />
-              <button type="submit" className="btn btn--primary" disabled={!typedValue.trim()}>
+              <button
+                type="submit"
+                className="btn btn--primary"
+                disabled={!typedValue.trim()}
+              >
                 Gönder
               </button>
             </form>
             <button className="btn btn--ghost" onClick={game.skip}>
               Bilmiyorum, geç
             </button>
-            <WorldMap markers={game.markers} countryOwnerById={countryOwnerById} />
-            {game.multiplayer && <PlayerAnswerLists targets={targets} answerOwners={game.answerOwners} />}
+            <WorldMap
+              markers={game.markers}
+              countryOwnerById={countryOwnerById}
+            />
+<PlayerAnswerLists
+  targets={targets}
+  answerOwners={game.answerOwners}
+/>
           </>
         )}
 
         {withChoices && game.choiceResult && (
           <div className="feedback">
             <p className="feedback-text">
-              {game.choiceResult.correct ? "Doğru." : `Doğru cevap: ${game.current?.answer}`}
+              {game.choiceResult.correct
+                ? "Doğru."
+                : `Doğru cevap: ${game.current?.answer}`}
             </p>
-            <button className="btn btn--primary" onClick={game.confirmChoiceAndAdvance}>
+            <button
+              className="btn btn--primary"
+              onClick={game.confirmChoiceAndAdvance}
+            >
               Sonraki
             </button>
           </div>
@@ -748,7 +938,13 @@ function ClueGameScreen({
 // ---------- mod menüsü ----------
 
 function ModeMenu({ onPick }: { onPick: (mode: GameMode) => void }) {
-  const order: GameMode[] = ["capital-write", "country-write", "city-write", "flag-write", "flag-choice"];
+  const order: GameMode[] = [
+    "capital-write",
+    "country-write",
+    "city-write",
+    "flag-write",
+    "flag-choice",
+  ];
   return (
     <div className="card card--menu">
       <span className="eyebrow-mark">Atlas Quiz</span>
@@ -788,12 +984,16 @@ function PlayerSetup({
         </button>
         <button className="mode-card" onClick={() => onPick("versus")}>
           <span className="mode-card-title">Yerel 1v1</span>
-          <span className="mode-card-hint">Aynı bilgisayarda sırayla yazın. Oyuncu 1 mavi, Oyuncu 2 kırmızı.</span>
+          <span className="mode-card-hint">
+            Aynı bilgisayarda sırayla yazın. Oyuncu 1 mavi, Oyuncu 2 kırmızı.
+          </span>
         </button>
         {mode !== "flag-write" && (
           <button className="mode-card" onClick={() => onPick("online")}>
             <span className="mode-card-title">Çevrimiçi 1v1</span>
-            <span className="mode-card-hint">Oda koduyla farklı cihazlardan bağlanın.</span>
+            <span className="mode-card-hint">
+              Oda koduyla farklı cihazlardan bağlanın.
+            </span>
           </button>
         )}
       </div>
@@ -803,7 +1003,15 @@ function PlayerSetup({
 
 // ---------- oyun ekranı yönlendirici ----------
 
-function GameScreen({ mode, pool, onExit }: { mode: GameMode; pool: Country[]; onExit: () => void }) {
+function GameScreen({
+  mode,
+  pool,
+  onExit,
+}: {
+  mode: GameMode;
+  pool: Country[];
+  onExit: () => void;
+}) {
   const [playerMode, setPlayerMode] = useState<PlayerMode | null>(null);
   const [onlineRoom, setOnlineRoom] = useState<OnlineRoom | null>(null);
   const [onlinePlayerNumber, setOnlinePlayerNumber] = useState<1 | 2>(1);
@@ -821,7 +1029,14 @@ function GameScreen({ mode, pool, onExit }: { mode: GameMode; pool: Country[]; o
   }, [mode, pool]);
 
   if (mode === "flag-choice") {
-    return <ClueGameScreen targets={targets} withChoices playerMode="solo" onExit={onExit} />;
+    return (
+      <ClueGameScreen
+        targets={targets}
+        withChoices
+        playerMode="solo"
+        onExit={onExit}
+      />
+    );
   }
 
   if (playerMode === null) {
@@ -853,10 +1068,24 @@ function GameScreen({ mode, pool, onExit }: { mode: GameMode; pool: Country[]; o
   }
 
   if (mode === "flag-write") {
-    return <ClueGameScreen targets={targets} withChoices={false} playerMode={playerMode} onExit={onExit} />;
+    return (
+      <ClueGameScreen
+        targets={targets}
+        withChoices={false}
+        playerMode={playerMode}
+        onExit={onExit}
+      />
+    );
   }
 
-  return <FreeTypeGameScreen mode={mode} targets={targets} playerMode={playerMode} onExit={onExit} />;
+  return (
+    <FreeTypeGameScreen
+      mode={mode}
+      targets={targets}
+      playerMode={playerMode}
+      onExit={onExit}
+    />
+  );
 }
 
 // ---------- kök bileşen ----------
@@ -898,7 +1127,12 @@ function App() {
       {mode === null ? (
         <ModeMenu onPick={setMode} />
       ) : (
-        <GameScreen key={mode} mode={mode} pool={countries} onExit={() => setMode(null)} />
+        <GameScreen
+          key={mode}
+          mode={mode}
+          pool={countries}
+          onExit={() => setMode(null)}
+        />
       )}
     </div>
   );
