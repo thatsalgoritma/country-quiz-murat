@@ -306,34 +306,32 @@ function PlayerAnswerLists({
   const playerItems = (player: PlayerId) =>
     targets.filter((target) => answerOwners.get(target.key) === player);
 
-  return (
-    <div className="player-answer-lists">
-      {([1, 2] as const).map((player) => {
-        const items = playerItems(player);
-        return (
-          <section
-            key={player}
-            className={`player-answer-list player-answer-list--${player}`}
-          >
+return (
+  <div className="player-answer-lists">
+    {([1, 2] as const).map((player) => {
+      const items = playerItems(player);
+
+      return (
+        <section
+          key={player}
+          className={`player-answer-list player-answer-list--${player}`}
+        >
+          {playerNames && (
             <h2>
-              {playerNames?.[player] ?? `Oyuncu ${player}`} · {items.length}
-            </h2>{" "}
-            {items.length === 0 ? (
-              <p>Henüz doğru cevap yok.</p>
-            ) : (
-              <ul>
-                {items.map((target) => (
-                  <li key={target.key}>
-                    {target.countryName} <span>{target.answer}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        );
-      })}
-    </div>
-  );
+              {playerNames[player]} · {items.length}
+            </h2>
+          )}
+
+          <ul>
+            {items.map((target) => (
+              <li key={target.key}>{target.answer}</li>
+            ))}
+          </ul>
+        </section>
+      );
+    })}
+  </div>
+);
 }
 
 // ---------- serbest yazma modları (başkent / ülke / şehir) ----------

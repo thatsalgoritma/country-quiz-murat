@@ -9,6 +9,7 @@ export interface Country {
   latlng: [number, number];
   ccn3: string; // ISO numeric code, matches world-atlas topojson feature id
   cca3: string; // ISO alpha-3 code, used as a stable key (e.g. for the city list)
+  area: number;
 }
 
 let cache: Country[] | null = null;
@@ -27,6 +28,7 @@ export async function fetchCountries(): Promise<Country[]> {
       latlng: c.latlng as [number, number],
       ccn3: c.ccn3,
       cca3: c.cca3,
+      area: c.area,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 

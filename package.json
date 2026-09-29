@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "cities:generate": "node scripts/generate-city-clues.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "data:update": "node scripts/fetch-country-stats.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1",
