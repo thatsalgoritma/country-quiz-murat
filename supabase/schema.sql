@@ -2,7 +2,7 @@ create table public.game_rooms (
   id uuid primary key default gen_random_uuid(),
   code text not null unique check (code ~ '^[A-Z0-9]{6}$'),
   host_id uuid not null references auth.users(id),
-  mode text not null check (mode in ('capital-write', 'country-write', 'city-write', 'flag-write')),
+  mode text not null check (mode in ('capital-write', 'country-write', 'city-write', 'flag-write', 'country-compare')),
   status text not null default 'waiting' check (status in ('waiting', 'playing', 'finished')),
   active_player smallint not null default 1 check (active_player in (1, 2)),
   created_at timestamptz not null default now()

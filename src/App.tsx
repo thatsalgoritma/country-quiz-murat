@@ -17,6 +17,12 @@ import {
 import { WorldMap } from "./WorldMap";
 import { formatElapsed } from "./useTimer";
 import "./App.css";
+import {
+  useCountryCompareGame,
+  type CompareMetric,
+} from "./useCountryCompareGame";
+import { useOnlineCountryCompareGame } from "./useOnlineCountryCompareGame";
+import { countryStats } from "./data/countryStats";
 
 type LoadState = "loading" | "ready" | "error";
 type GameMode =
@@ -24,7 +30,8 @@ type GameMode =
   | "country-write"
   | "city-write"
   | "flag-write"
-  | "flag-choice";
+  | "flag-choice"
+  | "country-compare";
 type PlayerMode = "solo" | "versus" | "online";
 
 const MODE_LABELS: Record<GameMode, { title: string; hint: string }> = {
@@ -38,6 +45,11 @@ const MODE_LABELS: Record<GameMode, { title: string; hint: string }> = {
   "flag-choice": {
     title: "Bayraktan Ülke (4 Şıklı)",
     hint: "Bayrağı gör, doğru şıkkı seç",
+  },
+  "country-compare": {
+    title: "Ülke Karşılaştırması",
+    hint: "Ülkeleri nüfus, yüzölçümü ve ekonomiyle karşılaştır.",
+
   },
 };
 
@@ -530,7 +542,7 @@ function OnlineLobby({
   onReady,
   onExit,
 }: {
-  mode: "capital-write" | "country-write" | "city-write";
+  mode: "capital-write" | "country-write" | "city-write" | "country-compare";
   onReady: (room: OnlineRoom, playerNumber: 1 | 2) => void;
   onExit: () => void;
 }) {
@@ -933,6 +945,177 @@ function ClueGameScreen({
   );
 }
 
+const COMPARE_METRICS: { value: CompareMetric; label: string }[] = [
+  { value: "population", label: "Nüfus" },
+  { value: "area", label: "Yüzölçümü" },
+  { value: "gdp", label: "GSYİH" },
+  { value: "gdpPerCapita", label: "Kişi başı GSYİH" },
+];
+
+function CompareRules() {
+  return <section className="compare-rules"><strong>Kurallar</strong><ul>
+    <li>Her turda ölçüt ve daha fazla/daha az yönü rastgele belirlenir.</li>
+    <li>Başlangıç ülkesi rastgeledir; doğru cevap sonraki turun referansı olur.</li>
+    <li>Aynı ülke ikinci kez kabul edilmez. Çok oyunculu oyunda hatalı cevapta sıra rakibe geçer.</li>
+  </ul></section>;
+}
+
+function CountryCompareGameScreen({ pool, playerMode, room, playerNumber, onPick, onReady, onExit }: {
+  pool: Country[]; playerMode: PlayerMode | null; room: OnlineRoom | null;
+  playerNumber: 1 | 2; onPick: (mode: PlayerMode) => void; onReady: (room: OnlineRoom, player: 1 | 2) => void; onExit: () => void;
+}) {
+  if (!playerMode) return <PlayerSetup mode="country-compare" onPick={onPick} onBack={onExit} />;
+  if (playerMode === "online") {
+    if (!room) return <OnlineLobby mode="country-compare" onReady={onReady} onExit={onExit} />;
+    return <OnlineCountryCompareRound pool={pool} room={room} playerNumber={playerNumber} onExit={onExit} />;
+  }
+  return <CountryCompareRound pool={pool} playerMode={playerMode} onExit={onExit} />;
+}
+
+function CountryCompareRound({ pool, playerMode, onExit }: { pool: Country[]; playerMode: "solo" | "versus"; onExit: () => void }) {
+  const game = useCountryCompareGame(pool, playerMode);
+  const [typedValue, setTypedValue] = useState("");
+
+  const metricLabel = COMPARE_METRICS.find((item) => item.value === game.metric)?.label ?? "";
+
+  const formatValue = (value: number | null) =>
+    value === null
+      ? "Veri yok"
+      : new Intl.NumberFormat("tr-TR", {
+          maximumFractionDigits: 0,
+        }).format(value);
+
+  const currentYear =
+    game.current && game.metric !== "area"
+      ? countryStats[game.current.cca3]?.[game.metric]?.year
+      : null;
+
+  const scores = ([1, 2] as const).map(
+    (player) =>
+      [...game.answerOwners.values()].filter((owner) => owner === player)
+        .length,
+  );
+
+  const submit = () => {
+    game.submit(typedValue); setTypedValue("");
+  };
+
+  if (game.finished) {
+    return (
+      <div className="card card--summary">
+        <span className="eyebrow-mark">Oyun tamamlandı</span>
+        <h1 className="summary-time">
+          {game.winner ? `Oyuncu ${game.winner} kazandı!` : "Oyun bitti"}
+        </h1>
+        {playerMode === "versus" && <p className="summary-line">Oyuncu 1: {scores[0]} · Oyuncu 2: {scores[1]}</p>}
+        <div className="summary-actions">
+          <button className="btn btn--ghost" onClick={onExit}>
+            Modlar
+          </button>
+          <button className="btn btn--primary" onClick={game.restart}>
+            Yeniden başla
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <GameHeader
+        title="Ülke Karşılaştırma"
+        timeLabel={formatElapsed(game.timer.elapsedMs)}
+        running={game.timer.running}
+        onToggleTimer={() =>
+          game.timer.running ? game.timer.pause() : game.timer.start()
+        }
+        progressLabel={`${game.used.size} kullanılan ülke`}
+        onFinish={game.finish}
+        onExit={onExit}
+      />
+
+      {playerMode === "versus" && <div className={`turn-banner turn-banner--${game.activePlayer}`}>Oyuncu {game.activePlayer} · Sıra sende</div>}
+
+      <div className="game-layout compare-layout">
+      {game.ready && game.current ? (
+        <div className="card card--compare compare-question-pane">
+          <span className="eyebrow-mark">{metricLabel}</span>
+          <h1 className="compare-country">{game.current.countryName}</h1>
+          <p className="compare-value">{formatValue(game.currentValue)}</p>
+          {currentYear && (
+            <p className="compare-year">Veri yılı: {currentYear}</p>
+          )}
+          <p className="summary-line">
+            Bu ülkeden {game.direction === "higher" ? "daha fazla" : "daha az"}{" "}
+            {metricLabel.toLocaleLowerCase("tr-TR")} değerine sahip bir ülke yaz.
+          </p>
+          <CompareRules />
+
+          <form
+            className="text-answer"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submit();
+            }}
+          >
+            <input
+              key={game.shakeToken}
+              className="text-answer-input shake-on-token"
+              value={typedValue}
+              onChange={(event) => setTypedValue(event.target.value)}
+              placeholder="Ülke adını yaz…"
+              autoFocus
+              autoComplete="off"
+            />
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={!typedValue.trim()}
+            >
+              Gönder
+            </button>
+          </form>
+
+          {playerMode === "versus" && <div className="compare-scores"><span>🔵 Oyuncu 1: {scores[0]}</span><span>🔴 Oyuncu 2: {scores[1]}</span></div>}
+        </div>
+      ) : (
+        <div className="card card--summary compare-question-pane">
+          <p className="summary-line">
+            Bu karşılaştırma için yeterli ülke verisi bulunamadı.
+          </p>
+          <button className="btn btn--primary" onClick={onExit}>
+            Modlara dön
+          </button>
+        </div>
+      )}
+        <div className="map-pane"><WorldMap markers={[]} countryOwnerById={game.countryOwnerById} /></div>
+        <aside className="list-pane compare-used-list"><h2>Kullanılan ülkeler</h2>{playerMode === "versus" ? <PlayerAnswerLists targets={pool.map((country) => ({ key: country.cca3, answer: country.name } as Target))} answerOwners={game.answerOwners} playerNames={{ 1: "Oyuncu 1", 2: "Oyuncu 2" }} /> : <ul>{pool.filter((country) => game.used.has(country.cca3)).map((country) => <li key={country.cca3}>{country.name}</li>)}</ul>}</aside>
+      </div>
+    </>
+  );
+}
+
+function OnlineCountryCompareRound({ pool, room, playerNumber, onExit }: { pool: Country[]; room: OnlineRoom; playerNumber: 1 | 2; onExit: () => void }) {
+  const game = useOnlineCountryCompareGame(pool, room, playerNumber);
+  const [typedValue, setTypedValue] = useState("");
+  const metricLabel = COMPARE_METRICS.find((item) => item.value === game.challenge?.metric)?.label ?? "";
+  const candidate = game.challenge?.current;
+  if (game.loading) return <p className="status-text">Oda yükleniyor…</p>;
+  if (game.room.status === "waiting") return <div className="card card--summary"><span className="eyebrow-mark">Oda kodu</span><h1 className="summary-time room-code-display">{game.room.code}</h1><p className="summary-line">İkinci oyuncunun bu kodla odaya katılması bekleniyor.</p><CompareRules /></div>;
+  if (game.finished) return <div className="card card--summary"><span className="eyebrow-mark">Oyun tamamlandı</span><h1 className="summary-time">Ülke kalmadı</h1><button className="btn btn--primary" onClick={onExit}>Odadan çık</button></div>;
+  const scores = ([1, 2] as const).map((player) => [...game.answers.values()].filter((owner) => owner === player).length);
+  return <>
+    <GameHeader title={`Ülke Karşılaştırma · Oda ${game.room.code}`} timeLabel="Canlı" running={false} onToggleTimer={() => undefined} progressLabel={`${game.answers.size} kullanılan ülke`} onFinish={onExit} finishLabel="Odadan çık" onExit={onExit} />
+    <div className={`turn-banner turn-banner--${game.room.active_player}`}>{game.room.active_player === playerNumber ? "Sıra sende" : "Rakibinin sırası"}</div>
+    <div className="game-layout compare-layout">
+      {candidate && game.challenge && <div className="card card--compare compare-question-pane"><span className="eyebrow-mark">{metricLabel}</span><h1 className="compare-country">{candidate.target.countryName}</h1><p className="compare-value">{new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(candidate.value)}</p><p className="summary-line">Bu ülkeden {game.challenge.direction === "higher" ? "daha fazla" : "daha az"} {metricLabel.toLocaleLowerCase("tr-TR")} değerine sahip bir ülke yaz.</p><CompareRules /><form className="text-answer" onSubmit={(event) => { event.preventDefault(); void game.submit(typedValue).then(() => setTypedValue("")); }}><input className="text-answer-input" value={typedValue} onChange={(event) => setTypedValue(event.target.value)} placeholder="Ülke adını yaz…" disabled={game.room.active_player !== playerNumber || game.submitting} autoComplete="off"/><button className="btn btn--primary" disabled={!typedValue.trim() || game.submitting || game.room.active_player !== playerNumber}>Gönder</button></form><div className="compare-scores"><span>{game.playerNames[1]}: {scores[0]}</span><span>{game.playerNames[2]}: {scores[1]}</span></div></div>}
+      <div className="map-pane"><WorldMap markers={[]} countryOwnerById={game.countryOwnerById} /></div>
+      <aside className="list-pane compare-used-list"><h2>Kullanılan ülkeler</h2><PlayerAnswerLists targets={pool.map((country) => ({ key: country.cca3, answer: country.name } as Target))} answerOwners={game.answers} playerNames={game.playerNames} /></aside>
+    </div>
+    {game.error && <p className="online-error online-error--game">{game.error}</p>}
+  </>;
+}
+
 // ---------- mod menüsü ----------
 
 function ModeMenu({ onPick }: { onPick: (mode: GameMode) => void }) {
@@ -942,6 +1125,7 @@ function ModeMenu({ onPick }: { onPick: (mode: GameMode) => void }) {
     "city-write",
     "flag-write",
     "flag-choice",
+    "country-compare",
   ];
   return (
     <div className="card card--menu">
@@ -964,7 +1148,7 @@ function PlayerSetup({
   onPick,
   onBack,
 }: {
-  mode: "capital-write" | "country-write" | "city-write" | "flag-write";
+  mode: "capital-write" | "country-write" | "city-write" | "flag-write" | "country-compare";
   onPick: (playerMode: PlayerMode) => void;
   onBack: () => void;
 }) {
@@ -1023,6 +1207,8 @@ function GameScreen({
         return buildCountryTargets(pool);
       case "city-write":
         return buildCityTargets(pool);
+      case "country-compare":
+         return [];
     }
   }, [mode, pool]);
 
@@ -1035,6 +1221,12 @@ function GameScreen({
         onExit={onExit}
       />
     );
+  }
+  if (mode === "country-compare") {
+    return <CountryCompareGameScreen pool={pool} playerMode={playerMode} room={onlineRoom} playerNumber={onlinePlayerNumber}
+      onPick={setPlayerMode}
+      onReady={(room, player) => { setOnlineRoom(room); setOnlinePlayerNumber(player); setPlayerMode("online"); }}
+      onExit={onExit} />;
   }
 
   if (playerMode === null) {
