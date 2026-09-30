@@ -160,8 +160,8 @@ function Checklist({
               </>
             ) : (
               <>
-                <span className="checklist-label" aria-label={t.countryName}>
-                  {t.flag}
+                <span className="checklist-label">
+                  <FlagImage flag={t.flag} flagCode={t.flagCode} countryName={t.countryName} className="flag-image--small" loading="lazy" />
                 </span>
                 <span className="checklist-value">
                   {showAnswer ? t.countryName : "—"}
@@ -180,6 +180,17 @@ function Checklist({
         );
       })}
     </ul>
+  );
+}
+
+function FlagImage({ flag, flagCode, countryName, className = "", loading = "eager" }: {
+  flag?: string; flagCode?: string; countryName: string; className?: string; loading?: "eager" | "lazy";
+}) {
+  return (
+    <span className={`flag-image-wrap ${className}`} role="img" aria-label={`${countryName} bayrağı`}>
+      <span className="flag-image-fallback" aria-hidden="true">{flag}</span>
+      {flagCode && <img src={`https://flagcdn.com/${flagCode}.svg`} alt="" loading={loading} onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+    </span>
   );
 }
 
@@ -852,9 +863,9 @@ function ClueGameScreen({
   answerOwners={game.answerOwners}
 />
 
-      <div className={"card" + (withChoices ? "" : " card--map")}>
+      <div className={"card" + (withChoices ? "" : " card--flag-write")}>
         {game.current && (
-          <div className="flag-display">{game.current.flag}</div>
+          <div className="flag-display"><FlagImage flag={game.current.flag} flagCode={game.current.flagCode} countryName={game.current.countryName} /></div>
         )}
 
         {withChoices ? (
@@ -1313,7 +1324,7 @@ function App() {
   }
 
   return (
-    <div className="stage">
+    <div className={`stage${mode === "country-compare" ? " stage--compare" : ""}`}>
       {mode === null ? (
         <ModeMenu onPick={setMode} />
       ) : (

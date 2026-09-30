@@ -63,6 +63,14 @@
   width: 100%;
 }
 
+.card--flag-write {
+  max-width: 50rem;
+}
+
+.card--flag-write .world-map {
+  height: 16rem;
+}
+
 .eyebrow-mark {
   font-family: "Inter", sans-serif;
   font-size: 0.8rem;
@@ -480,9 +488,50 @@
 }
 
 .flag-display {
-  font-size: 4.5rem;
   text-align: center;
   line-height: 1;
+}
+
+.flag-image-wrap {
+  position: relative;
+  display: inline-flex;
+  width: 8rem;
+  aspect-ratio: 3 / 2;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  vertical-align: middle;
+}
+
+.flag-image-fallback {
+  font-size: 3.5rem;
+}
+
+.flag-image-wrap img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.flag-image--small {
+  width: 1.5rem;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+}
+
+.flag-image--small .flag-image-fallback {
+  font-size: 1.1rem;
+}
+
+.flag-image--small img {
+  object-fit: cover;
 }
 
 .options {
@@ -799,6 +848,59 @@
   }
   .compare-layout .world-map {
     height: 20rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .stage--compare {
+    padding: 0.65rem;
+  }
+
+  .compare-question-pane {
+    padding: 0.65rem;
+    gap: 0.65rem;
+  }
+
+  .compare-country {
+    font-size: clamp(1rem, 5vw, 1.45rem);
+    overflow-wrap: anywhere;
+  }
+
+  .compare-value {
+    max-width: 100%;
+    font-size: clamp(1rem, 4.6vw, 1.4rem);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .compare-question-pane .summary-line {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  .compare-rules {
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+
+  .compare-question-pane .text-answer {
+    flex-direction: column;
+  }
+
+  .compare-question-pane .text-answer-input,
+  .compare-question-pane .text-answer .btn {
+    width: 100%;
+    min-height: 2.8rem;
+    font-size: 1rem;
+  }
+
+  .compare-layout .world-map {
+    height: 17rem;
+  }
+
+  .compare-layout .compare-used-list {
+    max-height: 12rem;
   }
 }
 

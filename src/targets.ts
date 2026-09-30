@@ -11,6 +11,7 @@ export interface Target {
   subregion: string;
   answer: string;
   flag?: string;
+  flagCode?: string;
   population?: number;
   lat: number;
   lng: number;
@@ -48,6 +49,7 @@ export function buildCountryTargets(pool: Country[]): Target[] {
       subregion: c.subregion,
       answer: c.name,
       flag: c.flag,
+      flagCode: c.cca2,
       lat: c.latlng[0],
       lng: c.latlng[1],
     }))

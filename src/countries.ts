@@ -6,6 +6,7 @@ export interface Country {
   region: string;
   subregion: string;
   flag: string; // emoji flag
+  cca2: string;
   latlng: [number, number];
   ccn3: string; // ISO numeric code, matches world-atlas topojson feature id
   cca3: string; // ISO alpha-3 code, used as a stable key (e.g. for the city list)
@@ -25,6 +26,7 @@ export async function fetchCountries(): Promise<Country[]> {
       region: c.region,
       subregion: c.subregion ?? c.region,
       flag: c.flag,
+      cca2: c.cca2.toLowerCase(),
       latlng: c.latlng as [number, number],
       ccn3: c.ccn3,
       cca3: c.cca3,
